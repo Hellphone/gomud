@@ -17,13 +17,6 @@ var names = map[string]string{
 	"chloe":   "Zjk%d82*ja)",
 }
 
-func (s *Server) HelloHandler(conn net.Conn) error {
-	fmt.Fprintf(conn, "Hello again! What would you like to do?\r\n"+
-		"[login, register, exit]\r\n")
-
-	return nil
-}
-
 func (s *Server) LoginHandler(conn net.Conn) error {
 	// TODO: keep constantly reading the input until correct or the user interrupts the process
 	fmt.Fprintf(conn, "Enter your name:\r\n")

@@ -23,7 +23,6 @@ func main() {
 	s := &server.Server{
 		Connection: conn,
 		Commands: map[string]string{
-			"hello":    "HelloHandler",
 			"login":    "LoginHandler",
 			"register": "RegisterHandler",
 			"exit":     "ExitHandler",
