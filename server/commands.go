@@ -1,12 +1,10 @@
 package server
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"os"
 	"os/exec"
-	"reflect"
 
 	"github.com/hellphone/gomud/helpers"
 )
@@ -28,6 +26,7 @@ func (s *Server) LoginHandler(conn net.Conn) error {
 	password, ok := names[name]
 	if ok {
 		fmt.Fprintf(conn, "Enter your password:\r\n")
+		// TODO: hide password input
 		p, err := helpers.GetInput(conn)
 		if err != nil {
 			return err
@@ -60,6 +59,7 @@ func (s *Server) RegisterHandler(conn net.Conn) error {
 		pass2, _ := helpers.GetInput(conn)
 		if pass == pass2 {
 			names[name] = pass
+			// TODO: log the user in
 			fmt.Fprintf(conn, "You have been successfully registered as %v!\r\n", name)
 		}
 	}
@@ -67,22 +67,9 @@ func (s *Server) RegisterHandler(conn net.Conn) error {
 	return nil
 }
 
-func (s *Server) ExitHandler(conn net.Conn) {
+func (s *Server) ExitHandler(conn net.Conn) error {
 	fmt.Fprintf(conn, "Goodbye!")
 	conn.Close()
-}
-
-func (s *Server) HandleCommand(conn net.Conn, command string) error {
-	if _, ok := s.Commands[command]; !ok {
-		return errors.New("this command does not exist")
-	}
-	f := reflect.ValueOf(s).MethodByName(s.Commands[command])
-	in := []reflect.Value{reflect.ValueOf(conn)}
-	ret := f.Call(in)
-	err := ret[0].Interface()
-	if err != nil {
-		return err.(error)
-	}
 
 	return nil
 }
@@ -95,6 +82,7 @@ func (s *Server) DefaultCommand(conn net.Conn, command string) error {
 }
 
 func StartGame(conn net.Conn) {
+	// TODO: change user state to in-game
 	fmt.Fprintf(conn, "Your adventure starts here...\r\n")
 }
 
