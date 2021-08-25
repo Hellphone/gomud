@@ -1,0 +1,10 @@
+# Server configurations
+server:
+  host: "localhost"
+  protocol: "tcp"
+  port: ":23"
+
+# Database credentials
+database:
+  user: "admin"
+  pass: "password"
