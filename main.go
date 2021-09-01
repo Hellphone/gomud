@@ -3,14 +3,15 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"github.com/hellphone/gomud/domain/models"
 	"log"
 	"net"
 	"os"
 	"strings"
 
+	"github.com/hellphone/gomud/domain/models"
 	"github.com/hellphone/gomud/server"
 	"github.com/hellphone/gomud/server/mongo"
+
 	"gopkg.in/yaml.v2"
 )
 

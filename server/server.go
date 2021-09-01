@@ -1,16 +1,22 @@
 package server
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net"
+
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Server struct {
 	Connection net.Conn
+	Context    context.Context
+	DBClient   *mongo.Client
 	commands   map[string]HandlerFunc
 }
 
-type HandlerFunc func(conn net.Conn) error
+type HandlerFunc func() error
 
 // TODO: probably store commands in the database (is this really needed?..)
 func (s *Server) RegisterCommand(name string, handler HandlerFunc) error {
@@ -30,7 +36,7 @@ func (s *Server) GetCommand(name string) (HandlerFunc, error) {
 		return command, nil
 	}
 
-	return nil, errors.New("command with this name has not been registered")
+	return nil, errors.New(fmt.Sprintf("%s: command with this name has not been registered", name))
 }
 
 func (s *Server) RegisterCommands() error {
@@ -39,6 +45,10 @@ func (s *Server) RegisterCommands() error {
 		return err
 	}
 	err = s.RegisterCommand("register", s.RegisterHandler)
+	if err != nil {
+		return err
+	}
+	err = s.RegisterCommand("db", s.DBHandler)
 	if err != nil {
 		return err
 	}

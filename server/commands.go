@@ -7,6 +7,8 @@ import (
 	"os/exec"
 
 	"github.com/hellphone/gomud/helpers"
+
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 var names = map[string]string{
@@ -16,60 +18,70 @@ var names = map[string]string{
 	"chloe":   "Zjk%d82*ja)",
 }
 
-func (s *Server) LoginHandler(conn net.Conn) error {
+func (s *Server) LoginHandler() error {
 	// TODO: keep constantly reading the input until correct or the user interrupts the process
-	fmt.Fprintf(conn, "Enter your name:\r\n")
-	name, err := helpers.GetInput(conn)
+	fmt.Fprintf(s.Connection, "Enter your name:\r\n")
+	name, err := helpers.GetInput(s.Connection)
 	if err != nil {
 		return err
 	}
 	password, ok := names[name]
 	if ok {
-		fmt.Fprintf(conn, "Enter your password:\r\n")
+		fmt.Fprintf(s.Connection, "Enter your password:\r\n")
 		// TODO: hide password input
-		p, err := helpers.GetInput(conn)
+		p, err := helpers.GetInput(s.Connection)
 		if err != nil {
 			return err
 		}
 		if p == password {
 			ClearScreen()
-			fmt.Fprintf(conn, "You successfully logged in as %v!\r\n", name)
-			StartGame(conn)
+			fmt.Fprintf(s.Connection, "You successfully logged in as %v!\r\n", name)
+			s.StartGame()
 		} else {
-			fmt.Fprintf(conn, "Sorry, but the password is not correct.\r\n")
+			fmt.Fprintf(s.Connection, "Sorry, but the password is not correct.\r\n")
 		}
 	} else {
-		fmt.Fprintf(conn, "Sorry, but there is no such name.\r\n")
+		fmt.Fprintf(s.Connection, "Sorry, but there is no such name.\r\n")
 	}
 
 	return nil
 }
 
-func (s *Server) RegisterHandler(conn net.Conn) error {
-	fmt.Fprintf(conn, "Enter your name:\r\n")
-	name, _ := helpers.GetInput(conn)
+func (s *Server) RegisterHandler() error {
+	fmt.Fprintf(s.Connection, "Enter your name:\r\n")
+	name, _ := helpers.GetInput(s.Connection)
 	_, ok := names[name]
 	if ok {
-		fmt.Fprintf(conn, "Sorry, but this name has already been taken.\r\n")
+		fmt.Fprintf(s.Connection, "Sorry, but this name has already been taken.\r\n")
 		// TODO: run this case again
 	} else {
-		fmt.Fprintf(conn, "Enter your password:\r\n")
-		pass, _ := helpers.GetInput(conn)
-		fmt.Fprintf(conn, "Confirm your password:\r\n")
-		pass2, _ := helpers.GetInput(conn)
+		fmt.Fprintf(s.Connection, "Enter your password:\r\n")
+		pass, _ := helpers.GetInput(s.Connection)
+		fmt.Fprintf(s.Connection, "Confirm your password:\r\n")
+		pass2, _ := helpers.GetInput(s.Connection)
 		if pass == pass2 {
 			names[name] = pass
 			// TODO: log the user in
-			fmt.Fprintf(conn, "You have been successfully registered as %v!\r\n", name)
+			fmt.Fprintf(s.Connection, "You have been successfully registered as %v!\r\n", name)
 		}
 	}
 
 	return nil
 }
 
-func (s *Server) ExitHandler(conn net.Conn) error {
-	fmt.Fprintf(conn, "Goodbye!")
-	conn.Close()
+func (s *Server) DBHandler() error {
+	databases, err := s.DBClient.ListDatabaseNames(s.Context, bson.M{})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(s.Connection, "databases list: %+v", databases)
+
+	return nil
+}
+
+func (s *Server) ExitHandler() error {
+	fmt.Fprintf(s.Connection, "Goodbye!")
+	s.Connection.Close()
 
 	return nil
 }
@@ -81,9 +93,9 @@ func (s *Server) DefaultCommand(conn net.Conn, command string) error {
 	return nil
 }
 
-func StartGame(conn net.Conn) {
+func (s *Server) StartGame() {
 	// TODO: change user state to in-game
-	fmt.Fprintf(conn, "Your adventure starts here...\r\n")
+	fmt.Fprintf(s.Connection, "Your adventure starts here...\r\n")
 }
 
 func ClearScreen() {
