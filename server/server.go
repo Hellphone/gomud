@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/hellphone/gomud/domain/models"
+
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -13,6 +15,7 @@ type Server struct {
 	Connection net.Conn
 	Context    context.Context
 	DBClient   *mongo.Client
+	User       *models.User
 	commands   map[string]HandlerFunc
 }
 

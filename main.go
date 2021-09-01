@@ -38,6 +38,7 @@ func main() {
 		Connection: conn,
 		Context:    ctx,
 		DBClient:   client,
+		User:       &models.User{},
 	}
 
 	err = s.RegisterCommands()

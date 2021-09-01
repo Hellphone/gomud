@@ -36,6 +36,8 @@ func (s *Server) LoginHandler() error {
 		if p == password {
 			ClearScreen()
 			fmt.Fprintf(s.Connection, "You successfully logged in as %v!\r\n", name)
+			// TODO: get user from DB
+			//s.User :=
 			s.StartGame()
 		} else {
 			fmt.Fprintf(s.Connection, "Sorry, but the password is not correct.\r\n")
@@ -95,6 +97,7 @@ func (s *Server) DefaultCommand(conn net.Conn, command string) error {
 
 func (s *Server) StartGame() {
 	// TODO: change user state to in-game
+	s.User.SwitchStatus()
 	fmt.Fprintf(s.Connection, "Your adventure starts here...\r\n")
 }
 
