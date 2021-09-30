@@ -18,72 +18,72 @@ var names = map[string]string{
 	"chloe":   "Zjk%d82*ja)",
 }
 
-func (s *Server) LoginHandler() error {
+func (s *Server) LoginHandler(conn Connection) error {
 	// TODO: keep constantly reading the input until correct or the user interrupts the process
-	fmt.Fprintf(s.Connection, "Enter your name:\r\n")
-	name, err := helpers.GetInput(s.Connection)
+	fmt.Fprintf(conn, "Enter your name:\r\n")
+	name, err := helpers.GetInput(conn)
 	if err != nil {
 		return err
 	}
 	password, ok := names[name]
 	if ok {
-		fmt.Fprintf(s.Connection, "Enter your password:\r\n")
+		fmt.Fprintf(conn, "Enter your password:\r\n")
 		// TODO: hide password input
-		p, err := helpers.GetInput(s.Connection)
+		p, err := helpers.GetInput(conn)
 		if err != nil {
 			return err
 		}
 		if p == password {
 			ClearScreen()
-			fmt.Fprintf(s.Connection, "You successfully logged in as %v!\r\n", name)
+			fmt.Fprintf(conn, "You successfully logged in as %v!\r\n", name)
 			// TODO: get user from DB
 			//s.User :=
-			s.StartGame()
+			s.StartGame(conn)
 		} else {
-			fmt.Fprintf(s.Connection, "Sorry, but the password is not correct.\r\n")
+			fmt.Fprintf(conn, "Sorry, but the password is not correct.\r\n")
 		}
 	} else {
-		fmt.Fprintf(s.Connection, "Sorry, but there is no such name.\r\n")
+		fmt.Fprintf(conn, "Sorry, but there is no such name.\r\n")
 	}
 
 	return nil
 }
 
-func (s *Server) RegisterHandler() error {
-	fmt.Fprintf(s.Connection, "Enter your name:\r\n")
-	name, _ := helpers.GetInput(s.Connection)
+func (s *Server) RegisterHandler(conn Connection) error {
+	fmt.Fprintf(conn, "Enter your name:\r\n")
+	name, _ := helpers.GetInput(conn)
 	_, ok := names[name]
 	if ok {
-		fmt.Fprintf(s.Connection, "Sorry, but this name has already been taken.\r\n")
+		fmt.Fprintf(conn, "Sorry, but this name has already been taken.\r\n")
 		// TODO: run this case again
 	} else {
-		fmt.Fprintf(s.Connection, "Enter your password:\r\n")
-		pass, _ := helpers.GetInput(s.Connection)
-		fmt.Fprintf(s.Connection, "Confirm your password:\r\n")
-		pass2, _ := helpers.GetInput(s.Connection)
+		fmt.Fprintf(conn, "Enter your password:\r\n")
+		pass, _ := helpers.GetInput(conn)
+		fmt.Fprintf(conn, "Confirm your password:\r\n")
+		pass2, _ := helpers.GetInput(conn)
 		if pass == pass2 {
 			names[name] = pass
 			// TODO: log the user in
-			fmt.Fprintf(s.Connection, "You have been successfully registered as %v!\r\n", name)
+			fmt.Fprintf(conn, "You have been successfully registered as %v!\r\n", name)
 		}
 	}
 
 	return nil
 }
 
-func (s *Server) DBHandler() error {
+func (s *Server) DBHandler(conn Connection) error {
 	databases, err := s.DBClient.ListDatabaseNames(s.Context, bson.M{})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(s.Connection, "databases list: %+v", databases)
+	fmt.Fprintf(conn, "databases list: %+v", databases)
 
 	return nil
 }
 
-func (s *Server) ExitHandler() error {
-	fmt.Fprintf(s.Connection, "Goodbye!")
-	s.Connection.Close()
+func (s *Server) ExitHandler(conn Connection) error {
+	fmt.Fprintf(conn, "Goodbye!")
+	conn.Close()
 
 	return nil
 }
@@ -95,10 +95,10 @@ func (s *Server) DefaultCommand(conn net.Conn, command string) error {
 	return nil
 }
 
-func (s *Server) StartGame() {
+func (s *Server) StartGame(conn Connection) {
 	// TODO: change user state to in-game
-	s.User.SwitchStatus()
-	fmt.Fprintf(s.Connection, "Your adventure starts here...\r\n")
+	//s.User.SwitchStatus()
+	fmt.Fprintf(conn, "Your adventure starts here...\r\n")
 }
 
 func ClearScreen() {

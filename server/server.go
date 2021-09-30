@@ -12,16 +12,20 @@ import (
 )
 
 type Server struct {
-	Connection net.Conn
 	Context    context.Context
 	DBClient   *mongo.Client
-	User       *models.User
 	commands   map[string]HandlerFunc
 }
 
-type HandlerFunc func() error
+type HandlerFunc func(c Connection) error
 
-// TODO: probably store commands in the database (is this really needed?..)
+type Client struct {
+	Connection net.Conn
+	User       *models.User
+}
+
+type Connection net.Conn
+
 func (s *Server) RegisterCommand(name string, handler HandlerFunc) error {
 	if s.commands == nil {
 		s.commands = map[string]HandlerFunc{}
