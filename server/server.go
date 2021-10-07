@@ -7,17 +7,21 @@ import (
 	"net"
 
 	"github.com/hellphone/gomud/domain/models"
-
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type Server struct {
-	Context    context.Context
-	DBClient   *mongo.Client
-	commands   map[string]HandlerFunc
+	Context  context.Context
+	DBClient *mongo.Client
+	Clients  *ClientList
+	commands map[string]HandlerFunc
 }
 
 type HandlerFunc func(c Connection) error
+
+type ClientList struct {
+	Clients []Client
+}
 
 type Client struct {
 	Connection net.Conn
@@ -65,4 +69,21 @@ func (s *Server) RegisterCommands() error {
 	}
 
 	return nil
+}
+
+func (c *ClientList) CloseConnection(conn net.Conn) error {
+	for k, client := range c.Clients {
+		if client.Connection == conn {
+			c.Clients = RemoveIndex(c.Clients, k)
+			// TODO: find out why all connections are closing here
+			conn.Close()
+		}
+	}
+	return nil
+}
+
+func RemoveIndex(s []Client, index int) []Client {
+	result := make([]Client, 0)
+	result = append(result, s[:index]...)
+	return append(result, s[index+1:]...)
 }

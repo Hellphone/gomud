@@ -3,15 +3,31 @@ package helpers
 import (
 	"bufio"
 	"net"
-	"strings"
+	"regexp"
 )
 
 func GetInput(conn net.Conn) (string, error) {
-	message, err := bufio.NewReader(conn).ReadString('\n')
+	input, err := bufio.NewReader(conn).ReadString('\n')
 	if err != nil {
 		return "", err
 	}
-	message = strings.TrimRight(message, "\r\n")
+	input, err = processInputString(input)
+	if err != nil {
+		return "", err
+	}
 
-	return message, nil
+	return input, nil
+}
+
+func processInputString(str string) (string, error) {
+	// TODO: sanitize input (make the regexp right)
+	// TODO: get rid of these symbols: ←[A, ←[B, ←[C, ←[D (arrows, backspaces etc.)
+	reg, err := regexp.Compile(`[^a-zA-Z0-9]+`)
+	if err != nil {
+		return str, err
+	}
+
+	processedString := reg.ReplaceAllString(str, "")
+
+	return processedString, nil
 }

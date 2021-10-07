@@ -1,19 +1,20 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"log"
 	"net"
 	"os"
-	"strings"
 
 	"github.com/hellphone/gomud/domain/models"
+	"github.com/hellphone/gomud/helpers"
 	"github.com/hellphone/gomud/server"
 	"github.com/hellphone/gomud/server/mongo"
 
 	"gopkg.in/yaml.v2"
 )
+
+var clients server.ClientList
 
 func main() {
 	cfg, err := getConfig()
@@ -22,62 +23,47 @@ func main() {
 	}
 
 	fmt.Println("Connecting to database...")
-	ctx, client, err := mongo.ConnectToDB(cfg)
+	ctx, dbClient, err := mongo.ConnectToDB(cfg)
 	if err != nil {
 		fmt.Println("error connecting to database:", err)
 	}
-
-	var clients []server.Client
 
 	fmt.Println("Starting server...")
 	ln, _ := net.Listen(cfg.Server.Protocol, cfg.Server.Port)
 
 	// TODO: close connection if user is not active for 5-10 minutes by using goroutine
+	// context should not be stored inside a struct type:
+	// https://go.dev/blog/context-and-structs
 	s := &server.Server{
 		Context:  ctx,
-		DBClient: client,
+		DBClient: dbClient,
+		Clients:  &clients,
 	}
-
-	// TODO: for now store only the list of online users in memory
-	go func() {
-		for {
-			err := acceptConnections(ln, &clients)
-			if err != nil {
-				fmt.Printf("error: %s\n", err)
-				return
-			}
-		}
-	}()
 
 	err = s.RegisterCommands()
 	if err != nil {
 		return
 	}
 
-	for _, c := range clients {
-		go func(c *server.Client) {
-			for {
-				message, _ := bufio.NewReader(c.Connection).ReadString('\n')
-				message = strings.TrimRight(message, "\r\n")
-				command, err := s.GetCommand(message)
-				// TODO: learn how to handle errors properly
-				// TODO: get rid of commands causing errors when closing connection
-				if err != nil {
-					fmt.Printf("error: %v\n", err)
-				}
-
-				if command != nil {
-					err = command(c.Connection)
-					if err != nil {
-						fmt.Printf("error: %v\n", err)
-					}
-				}
-			}
-		}(&c)
-	}
-
+	// TODO: for now store only the list of online users in memory
 	for {
+		client, err := acceptConnection(ln, &s.Clients.Clients)
+		// TODO: use logger to handle errors (find an example in One Platform code)
+		if err != nil {
+			log.Println(err)
+			return
+		}
 
+		// !!!!!
+		// TODO: how to loop properly?
+		// !!!!!
+		go func(client *server.Client) {
+			err = handleInput(s, client)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+		}(client)
 	}
 }
 
@@ -98,18 +84,45 @@ func getConfig() (*models.Config, error) {
 	return cfg, nil
 }
 
-func acceptConnections(ln net.Listener, clients *[]server.Client) error {
+func acceptConnection(ln net.Listener, clients *[]server.Client) (*server.Client, error) {
 	conn, _ := ln.Accept()
-	*clients = append(*clients, server.Client{
+	client := server.Client{
 		Connection: conn,
 		User:       nil,
-	})
+	}
+	// TODO: delete client from the slice when closing connection
+	*clients = append(*clients, client)
+
 	_, err := fmt.Fprintf(conn, "Hello stranger! Welcome to GOMUD!\r\n"+
 		"What would you like to do?\r\n"+
 		"[login, register, exit]\r\n")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return &client, nil
+}
+
+func handleInput(s *server.Server, c *server.Client) error {
+	for {
+		message, err := helpers.GetInput(c.Connection)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		command, err := s.GetCommand(message)
+		// TODO: learn how to handle errors properly
+		// TODO: get rid of commands causing errors when closing connection
+		if err != nil {
+			// TODO: get rid of 'use of closed network connection' error
+			log.Println(err)
+		}
+
+		if command != nil {
+			err = command(c.Connection)
+			if err != nil {
+				log.Println(err)
+			}
+		}
+	}
 }

@@ -50,7 +50,7 @@ func (s *Server) LoginHandler(conn Connection) error {
 }
 
 func (s *Server) RegisterHandler(conn Connection) error {
-	fmt.Fprintf(conn, "Enter your name:\r\n")
+	fmt.Fprintf(conn, "Enter your name (only alphabetical and numeric symbols are allowed):\r\n")
 	name, _ := helpers.GetInput(conn)
 	_, ok := names[name]
 	if ok {
@@ -64,6 +64,7 @@ func (s *Server) RegisterHandler(conn Connection) error {
 		if pass == pass2 {
 			names[name] = pass
 			// TODO: log the user in
+			// TODO: highlight the name in different color if possible
 			fmt.Fprintf(conn, "You have been successfully registered as %v!\r\n", name)
 		}
 	}
@@ -82,8 +83,12 @@ func (s *Server) DBHandler(conn Connection) error {
 }
 
 func (s *Server) ExitHandler(conn Connection) error {
-	fmt.Fprintf(conn, "Goodbye!")
-	conn.Close()
+	fmt.Fprintf(conn, "Goodbye!\r\n")
+	// TODO: figure out how to run this method (not by passing Clients to Server)
+	err := s.Clients.CloseConnection(conn)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -96,7 +101,7 @@ func (s *Server) DefaultCommand(conn net.Conn, command string) error {
 }
 
 func (s *Server) StartGame(conn Connection) {
-	// TODO: change user state to in-game
+	// TODO: change user state to in-game (online?)
 	//s.User.SwitchStatus()
 	fmt.Fprintf(conn, "Your adventure starts here...\r\n")
 }
