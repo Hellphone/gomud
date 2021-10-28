@@ -25,7 +25,7 @@ func main() {
 	fmt.Println("Connecting to database...")
 	ctx, dbClient, err := mongo.ConnectToDB(cfg)
 	if err != nil {
-		fmt.Println("error connecting to database:", err)
+		log.Fatalf("error connecting to database: %s", err)
 	}
 
 	fmt.Println("Starting server...")
@@ -42,6 +42,7 @@ func main() {
 
 	err = s.RegisterCommands()
 	if err != nil {
+		log.Fatalf("error registering commands: %s", err)
 		return
 	}
 
@@ -51,17 +52,31 @@ func main() {
 		// TODO: use logger to handle errors (find an example in One Platform code)
 		if err != nil {
 			log.Println(err)
-			return
 		}
 
 		// !!!!!
 		// TODO: how to loop properly?
+		// если поставить for внутри go func, то при закрытии соединения постоянно
+		// будут идти ошибки use of closed network connection
+		// если убрать for, то после первой же ошибки чтение из консоли завершится
 		// !!!!!
+		// TODO: stop the goroutine correctly (using channels or context) when a connection is closed
+		// TODO: check sync.Wg etc.
+		quit := make(chan bool)
 		go func(client *server.Client) {
-			err = handleInput(s, client)
-			if err != nil {
-				log.Println(err)
-				return
+			for {
+				select {
+				case <-quit:
+					return
+				default:
+					err = handleInput(s, client)
+					// TODO: maybe handle several types of errors
+					// to separate warnings from fatal errors
+					if err != nil {
+						fmt.Println("You exited the goroutine")
+						quit <- true
+					}
+				}
 			}
 		}(client)
 	}
@@ -103,26 +118,29 @@ func acceptConnection(ln net.Listener, clients *[]server.Client) (*server.Client
 	return &client, nil
 }
 
+// TODO: maybe return different statuses instead of (or along with) errors
+// to handle different errors differently
 func handleInput(s *server.Server, c *server.Client) error {
-	for {
-		message, err := helpers.GetInput(c.Connection)
-		if err != nil {
-			log.Fatal(err)
-		}
+	message, err := helpers.GetInput(c.Connection)
+	// TODO: is it correct to return an error when a connection is closed?
+	if err != nil {
+		return err
+	}
 
-		command, err := s.GetCommand(message)
-		// TODO: learn how to handle errors properly
-		// TODO: get rid of commands causing errors when closing connection
-		if err != nil {
-			// TODO: get rid of 'use of closed network connection' error
-			log.Println(err)
-		}
+	command, err := s.GetCommand(message)
+	// TODO: learn how to handle errors properly
+	// TODO: get rid of commands causing errors when closing connection
+	if err != nil {
+		// TODO: get rid of 'use of closed network connection' error
+		return err
+	}
 
-		if command != nil {
-			err = command(c.Connection)
-			if err != nil {
-				log.Println(err)
-			}
+	if command != nil {
+		err = command(c.Connection)
+		if err != nil {
+			return err
 		}
 	}
+
+	return nil
 }
