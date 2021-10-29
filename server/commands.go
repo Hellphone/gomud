@@ -85,6 +85,7 @@ func (s *Server) DBHandler(conn Connection) error {
 func (s *Server) ExitHandler(conn Connection) error {
 	fmt.Fprintf(conn, "Goodbye!\r\n")
 	// TODO: figure out how to run this method (not by passing Clients to Server)
+	// TODO: add mutex
 	err := s.Clients.CloseConnection(conn)
 	if err != nil {
 		return err

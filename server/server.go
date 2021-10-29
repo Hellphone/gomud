@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 
 	"github.com/hellphone/gomud/domain/models"
@@ -23,6 +22,7 @@ type ClientList struct {
 	Clients []Client
 }
 
+// TODO: add states
 type Client struct {
 	Connection net.Conn
 	User       *models.User
@@ -47,7 +47,7 @@ func (s *Server) GetCommand(name string) (HandlerFunc, error) {
 		return command, nil
 	}
 
-	return nil, errors.New(fmt.Sprintf("%s: command with this name has not been registered", name))
+	return nil, models.ErrorCommandNotFound
 }
 
 func (s *Server) RegisterCommands() error {
@@ -74,9 +74,10 @@ func (s *Server) RegisterCommands() error {
 func (c *ClientList) CloseConnection(conn net.Conn) error {
 	for k, client := range c.Clients {
 		if client.Connection == conn {
+			// TODO: add mutex
 			c.Clients = RemoveIndex(c.Clients, k)
 			// TODO: find out why all connections are closing here
-			conn.Close()
+			return conn.Close()
 		}
 	}
 	return nil

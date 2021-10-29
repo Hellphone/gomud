@@ -54,6 +54,10 @@ func main() {
 			log.Println(err)
 		}
 
+		// TODO: сделать команду, позволяющую выкинуть пользователя по имени (заодно разобраться с параметрами)
+		// TODO: разобраться с обработкой команд с параметрами
+		// TODO: разобраться с состояниями пользователей (разрешать определённые команды только пользователям с определённым статусом)
+
 		// !!!!!
 		// TODO: how to loop properly?
 		// если поставить for внутри go func, то при закрытии соединения постоянно
@@ -62,20 +66,14 @@ func main() {
 		// !!!!!
 		// TODO: stop the goroutine correctly (using channels or context) when a connection is closed
 		// TODO: check sync.Wg etc.
-		quit := make(chan bool)
 		go func(client *server.Client) {
 			for {
-				select {
-				case <-quit:
+				err = handleInput(s, client)
+				// TODO: maybe handle several types of errors
+				// to separate warnings from fatal errors
+				if err != nil {
+					fmt.Println("You exited the goroutine")
 					return
-				default:
-					err = handleInput(s, client)
-					// TODO: maybe handle several types of errors
-					// to separate warnings from fatal errors
-					if err != nil {
-						fmt.Println("You exited the goroutine")
-						quit <- true
-					}
 				}
 			}
 		}(client)
@@ -105,7 +103,6 @@ func acceptConnection(ln net.Listener, clients *[]server.Client) (*server.Client
 		Connection: conn,
 		User:       nil,
 	}
-	// TODO: delete client from the slice when closing connection
 	*clients = append(*clients, client)
 
 	_, err := fmt.Fprintf(conn, "Hello stranger! Welcome to GOMUD!\r\n"+
@@ -128,10 +125,11 @@ func handleInput(s *server.Server, c *server.Client) error {
 	}
 
 	command, err := s.GetCommand(message)
-	// TODO: learn how to handle errors properly
-	// TODO: get rid of commands causing errors when closing connection
+	if err == models.ErrorCommandNotFound {
+		// TODO: write a message to the user
+		return nil
+	}
 	if err != nil {
-		// TODO: get rid of 'use of closed network connection' error
 		return err
 	}
 

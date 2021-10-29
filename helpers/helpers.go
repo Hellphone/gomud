@@ -19,6 +19,7 @@ func GetInput(conn net.Conn) (string, error) {
 	return input, nil
 }
 
+// TODO: search for golang sanitizing library
 func processInputString(str string) (string, error) {
 	// TODO: sanitize input (make the regexp right)
 	// TODO: get rid of these symbols: ←[A, ←[B, ←[C, ←[D (arrows, backspaces etc.)
