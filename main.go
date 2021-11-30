@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"sync"
 
 	"github.com/hellphone/gomud/domain/models"
 	"github.com/hellphone/gomud/helpers"
@@ -28,6 +29,8 @@ func main() {
 		log.Fatalf("error connecting to database: %s", err)
 	}
 
+	var wg *sync.WaitGroup
+
 	fmt.Println("Starting server...")
 	ln, _ := net.Listen(cfg.Server.Protocol, cfg.Server.Port)
 
@@ -46,6 +49,10 @@ func main() {
 		return
 	}
 
+	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	// TODO: разобраться с Mutex, WaitGroup, Goroutines и тому подобным
+	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 	// TODO: for now store only the list of online users in memory
 	for {
 		client, err := acceptConnection(ln, &s.Clients.Clients)
@@ -55,28 +62,20 @@ func main() {
 		}
 
 		// TODO: сделать команду, позволяющую выкинуть пользователя по имени (заодно разобраться с параметрами)
-		// TODO: разобраться с обработкой команд с параметрами
 		// TODO: разобраться с состояниями пользователей (разрешать определённые команды только пользователям с определённым статусом)
 
-		// !!!!!
-		// TODO: how to loop properly?
-		// если поставить for внутри go func, то при закрытии соединения постоянно
-		// будут идти ошибки use of closed network connection
-		// если убрать for, то после первой же ошибки чтение из консоли завершится
-		// !!!!!
-		// TODO: stop the goroutine correctly (using channels or context) when a connection is closed
+		// TODO: stop the goroutine correctly (gracefully, using channels or context) when a connection is closed
 		// TODO: check sync.Wg etc.
-		go func(client *server.Client) {
+		//wg.Add(1)
+		go func(client *server.Client, wg *sync.WaitGroup) {
+			//defer wg.Done()
 			for {
 				err = handleInput(s, client)
-				// TODO: maybe handle several types of errors
-				// to separate warnings from fatal errors
 				if err != nil {
-					fmt.Println("You exited the goroutine")
 					return
 				}
 			}
-		}(client)
+		}(client, wg)
 	}
 }
 
@@ -101,7 +100,9 @@ func acceptConnection(ln net.Listener, clients *[]server.Client) (*server.Client
 	conn, _ := ln.Accept()
 	client := server.Client{
 		Connection: conn,
-		User:       nil,
+		User: &models.User{
+			Status: models.StatusOffline,
+		},
 	}
 	*clients = append(*clients, client)
 
@@ -115,18 +116,16 @@ func acceptConnection(ln net.Listener, clients *[]server.Client) (*server.Client
 	return &client, nil
 }
 
-// TODO: maybe return different statuses instead of (or along with) errors
-// to handle different errors differently
 func handleInput(s *server.Server, c *server.Client) error {
-	message, err := helpers.GetInput(c.Connection)
-	// TODO: is it correct to return an error when a connection is closed?
+	message, parameter, err := helpers.GetCommandInput(c.Connection)
 	if err != nil {
 		return err
 	}
 
 	command, err := s.GetCommand(message)
+	// TODO: maybe create a link between client and server error message to output them easier
 	if err == models.ErrorCommandNotFound {
-		// TODO: write a message to the user
+		fmt.Fprintf(c.Connection, "Sorry, but this command does not exist. Please repeat your input\r\n")
 		return nil
 	}
 	if err != nil {
@@ -134,7 +133,11 @@ func handleInput(s *server.Server, c *server.Client) error {
 	}
 
 	if command != nil {
-		err = command(c.Connection)
+		err = command(c, parameter)
+		if err == models.ErrorUserNotFound {
+			fmt.Fprintf(c.Connection, "Sorry, but this user can not be found\r\n")
+			return nil
+		}
 		if err != nil {
 			return err
 		}

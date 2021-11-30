@@ -14,7 +14,7 @@ type User struct {
 	Location string
 }
 
-// TODO: change status in DB
+// TODO: change status in DB (no need)
 func (u *User) SwitchStatus() {
 	if u.Status == StatusOffline {
 		u.Status = StatusOnline

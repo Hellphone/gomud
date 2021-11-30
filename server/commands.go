@@ -2,14 +2,17 @@ package server
 
 import (
 	"fmt"
-	"net"
+	"github.com/hellphone/gomud/domain/models"
 	"os"
 	"os/exec"
+	"sync"
 
 	"github.com/hellphone/gomud/helpers"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
+
+var mu *sync.Mutex
 
 var names = map[string]string{
 	"john":    "12345",
@@ -18,75 +21,128 @@ var names = map[string]string{
 	"chloe":   "Zjk%d82*ja)",
 }
 
-func (s *Server) LoginHandler(conn Connection) error {
+// TODO: maybe pass a struct storing a connection
+func (s *Server) LoginHandler(client *Client, args ...string) error {
 	// TODO: keep constantly reading the input until correct or the user interrupts the process
-	fmt.Fprintf(conn, "Enter your name:\r\n")
-	name, err := helpers.GetInput(conn)
+	fmt.Fprintf(client.Connection, "Enter your name:\r\n")
+	name, err := helpers.GetInput(client.Connection)
 	if err != nil {
 		return err
 	}
 	password, ok := names[name]
 	if ok {
-		fmt.Fprintf(conn, "Enter your password:\r\n")
+		fmt.Fprintf(client.Connection, "Enter your password:\r\n")
 		// TODO: hide password input
-		p, err := helpers.GetInput(conn)
+		p, err := helpers.GetInput(client.Connection)
 		if err != nil {
 			return err
 		}
 		if p == password {
 			ClearScreen()
-			fmt.Fprintf(conn, "You successfully logged in as %v!\r\n", name)
+			fmt.Fprintf(client.Connection, "You successfully logged in as %v!\r\n", name)
+			// TODO: create a function linking a user to a connection
+			for k, v := range s.Clients.Clients {
+				if v.Connection == client.Connection {
+					s.Clients.Clients[k].User.Login = name
+					s.Clients.Clients[k].User.Status = models.StatusOnline
+					break
+				}
+			}
 			// TODO: get user from DB
 			//s.User :=
-			s.StartGame(conn)
+			s.StartGame(client)
 		} else {
-			fmt.Fprintf(conn, "Sorry, but the password is not correct.\r\n")
+			fmt.Fprintf(client.Connection, "Sorry, but the password is not correct.\r\n")
 		}
 	} else {
-		fmt.Fprintf(conn, "Sorry, but there is no such name.\r\n")
+		fmt.Fprintf(client.Connection, "Sorry, but there is no such name.\r\n")
 	}
 
 	return nil
 }
 
-func (s *Server) RegisterHandler(conn Connection) error {
-	fmt.Fprintf(conn, "Enter your name (only alphabetical and numeric symbols are allowed):\r\n")
-	name, _ := helpers.GetInput(conn)
+func (s *Server) RegisterHandler(client *Client, args ...string) error {
+	fmt.Fprintf(client.Connection, "Enter your name (only alphabetical and numeric symbols are allowed):\r\n")
+	name, _ := helpers.GetInput(client.Connection)
 	_, ok := names[name]
 	if ok {
-		fmt.Fprintf(conn, "Sorry, but this name has already been taken.\r\n")
+		fmt.Fprintf(client.Connection, "Sorry, but this name has already been taken.\r\n")
 		// TODO: run this case again
 	} else {
-		fmt.Fprintf(conn, "Enter your password:\r\n")
-		pass, _ := helpers.GetInput(conn)
-		fmt.Fprintf(conn, "Confirm your password:\r\n")
-		pass2, _ := helpers.GetInput(conn)
+		fmt.Fprintf(client.Connection, "Enter your password:\r\n")
+		pass, _ := helpers.GetInput(client.Connection)
+		fmt.Fprintf(client.Connection, "Confirm your password:\r\n")
+		pass2, _ := helpers.GetInput(client.Connection)
 		if pass == pass2 {
 			names[name] = pass
 			// TODO: log the user in
 			// TODO: highlight the name in different color if possible
-			fmt.Fprintf(conn, "You have been successfully registered as %v!\r\n", name)
+			fmt.Fprintf(client.Connection, "You have been successfully registered as %v!\r\n", name)
 		}
 	}
 
 	return nil
 }
 
-func (s *Server) DBHandler(conn Connection) error {
+func (s *Server) DBHandler(client *Client, args ...string) error {
 	databases, err := s.DBClient.ListDatabaseNames(s.Context, bson.M{})
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(conn, "databases list: %+v", databases)
+	fmt.Fprintf(client.Connection, "databases list: %+v", databases)
 
 	return nil
 }
 
-func (s *Server) ExitHandler(conn Connection) error {
-	fmt.Fprintf(conn, "Goodbye!\r\n")
+// TODO: make this function available only for authorized users
+func (s *Server) KickoutHandler(client *Client, args ...string) error {
+	// TODO: add confirmation ("Are you sure to kick %USERNAME% out?)"
+
+	if client.User.Status != models.StatusOnline {
+		fmt.Fprintf(client.Connection, "Not enough rights to proceed with this operation\r\n")
+		return nil
+	}
+
+	for _, v := range args {
+		fmt.Fprintf(client.Connection, "arg: %v\n", v)
+	}
+
+	fmt.Fprintf(client.Connection, "args: %+v\n", args)
+	fmt.Fprintf(client.Connection, "args length: %v\n", len(args))
+
+	// for some reason there is always an argument inside
+	// TODO: find out why
+	if len(args) < 1 {
+		return models.ErrorNotEnoughArguments
+	}
+
+	username := args[0]
+	kicked := false
+	for _, c := range s.Clients.Clients {
+		if c.User.Login == username {
+			c.User.SwitchStatus()
+			kicked = true
+			fmt.Fprintf(client.Connection, "You have successfully kicked %s out\r\n", username)
+			fmt.Fprintf(c.Connection, "You have been kicked out by %s\r\n", client.User.Login)
+			s.Clients.CloseConnection(c.Connection, mu)
+
+			break
+		}
+	}
+
+	if !kicked {
+		return models.ErrorUserNotFound
+	}
+
+	return nil
+}
+
+func (s *Server) ExitHandler(client *Client, args ...string) error {
+	fmt.Fprintf(client.Connection, "Goodbye!\r\n")
 	// TODO: figure out how to run this method (not by passing Clients to Server)
+	// (it's okay)
 	// TODO: add mutex
-	err := s.Clients.CloseConnection(conn)
+	err := s.Clients.CloseConnection(client.Connection, mu)
 	if err != nil {
 		return err
 	}
@@ -94,17 +150,17 @@ func (s *Server) ExitHandler(conn Connection) error {
 	return nil
 }
 
-func (s *Server) DefaultCommand(conn net.Conn, command string) error {
-	fmt.Fprintf(conn, "What would you like to do?\r\n"+
+func (s *Server) DefaultCommand(client *Client, command string) error {
+	fmt.Fprintf(client.Connection, "What would you like to do?\r\n"+
 		"[login, register, exit]\r\n")
 
 	return nil
 }
 
-func (s *Server) StartGame(conn Connection) {
+func (s *Server) StartGame(client *Client) {
 	// TODO: change user state to in-game (online?)
 	//s.User.SwitchStatus()
-	fmt.Fprintf(conn, "Your adventure starts here...\r\n")
+	fmt.Fprintf(client.Connection, "Your adventure starts here...\r\n")
 }
 
 func ClearScreen() {

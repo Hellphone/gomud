@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net"
+	"sync"
 
 	"github.com/hellphone/gomud/domain/models"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -16,7 +17,7 @@ type Server struct {
 	commands map[string]HandlerFunc
 }
 
-type HandlerFunc func(c Connection) error
+type HandlerFunc func(c *Client, args ...string) error
 
 type ClientList struct {
 	Clients []Client
@@ -24,6 +25,7 @@ type ClientList struct {
 
 // TODO: add states
 type Client struct {
+	ID         string
 	Connection net.Conn
 	User       *models.User
 }
@@ -63,6 +65,10 @@ func (s *Server) RegisterCommands() error {
 	if err != nil {
 		return err
 	}
+	err = s.RegisterCommand("kickout", s.KickoutHandler)
+	if err != nil {
+		return err
+	}
 	err = s.RegisterCommand("exit", s.ExitHandler)
 	if err != nil {
 		return err
@@ -71,12 +77,14 @@ func (s *Server) RegisterCommands() error {
 	return nil
 }
 
-func (c *ClientList) CloseConnection(conn net.Conn) error {
+func (c *ClientList) CloseConnection(conn net.Conn, mu *sync.Mutex) error {
 	for k, client := range c.Clients {
 		if client.Connection == conn {
 			// TODO: add mutex
+			// something is wrong and causes panic
+			mu.Lock()
 			c.Clients = RemoveIndex(c.Clients, k)
-			// TODO: find out why all connections are closing here
+			mu.Unlock()
 			return conn.Close()
 		}
 	}
