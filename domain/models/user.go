@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 const (
 	StatusOffline Status = iota
 	StatusOnline
@@ -8,10 +10,11 @@ const (
 type Status int
 
 type User struct {
-	Login    string
-	Level    int
-	Status   Status
-	Location string
+	Login          string
+	Level          int
+	Status         Status
+	LastActionTime time.Time
+	Location       string
 }
 
 // TODO: change status in DB (no need)

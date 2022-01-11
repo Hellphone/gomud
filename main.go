@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/hellphone/gomud/domain/models"
 	"github.com/hellphone/gomud/helpers"
@@ -29,12 +30,11 @@ func main() {
 		log.Fatalf("error connecting to database: %s", err)
 	}
 
-	var wg *sync.WaitGroup
+	//var wg *sync.WaitGroup
 
 	fmt.Println("Starting server...")
 	ln, _ := net.Listen(cfg.Server.Protocol, cfg.Server.Port)
 
-	// TODO: close connection if user is not active for 5-10 minutes by using goroutine
 	// context should not be stored inside a struct type:
 	// https://go.dev/blog/context-and-structs
 	s := &server.Server{
@@ -49,6 +49,25 @@ func main() {
 		return
 	}
 
+	go func() {
+		// TODO: close connection if user is not active for 5-10 minutes by using goroutine
+		for {
+			var mu *sync.Mutex
+			for _, client := range s.Clients.Clients {
+				// check last active time
+				timeAfterFiveMinutes := client.User.LastActionTime.Add(5 * time.Minute)
+				if time.Now().After(timeAfterFiveMinutes) {
+					fmt.Println("You have been inactive for 5 minutes and will be kicked out")
+					err := s.Clients.CloseConnection(client.Connection, mu)
+					if err != nil {
+						log.Println(err)
+					}
+				}
+			}
+			time.Sleep(5 * time.Second)
+		}
+	}()
+
 	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!
 	// TODO: разобраться с Mutex, WaitGroup, Goroutines и тому подобным
 	// !!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -61,13 +80,12 @@ func main() {
 			log.Println(err)
 		}
 
-		// TODO: сделать команду, позволяющую выкинуть пользователя по имени (заодно разобраться с параметрами)
 		// TODO: разобраться с состояниями пользователей (разрешать определённые команды только пользователям с определённым статусом)
 
 		// TODO: stop the goroutine correctly (gracefully, using channels or context) when a connection is closed
 		// TODO: check sync.Wg etc.
 		//wg.Add(1)
-		go func(client *server.Client, wg *sync.WaitGroup) {
+		go func(client *server.Client) {
 			//defer wg.Done()
 			for {
 				err = handleInput(s, client)
@@ -75,7 +93,7 @@ func main() {
 					return
 				}
 			}
-		}(client, wg)
+		}(client)
 	}
 }
 
@@ -102,6 +120,7 @@ func acceptConnection(ln net.Listener, clients *[]server.Client) (*server.Client
 		Connection: conn,
 		User: &models.User{
 			Status: models.StatusOffline,
+			LastActionTime: time.Now(),
 		},
 	}
 	*clients = append(*clients, client)
@@ -134,11 +153,14 @@ func handleInput(s *server.Server, c *server.Client) error {
 
 	if command != nil {
 		err = command(c, parameter)
-		if err == models.ErrorUserNotFound {
+		switch err {
+		case models.ErrorUserNotFound:
 			fmt.Fprintf(c.Connection, "Sorry, but this user can not be found\r\n")
-			return nil
-		}
-		if err != nil {
+		case models.ErrorNotEnoughArguments:
+			fmt.Fprintf(c.Connection, "Not enough arguments\r\n")
+		case nil:
+			c.UpdateLastActionTime()
+		default:
 			return err
 		}
 	}

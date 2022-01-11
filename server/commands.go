@@ -94,7 +94,6 @@ func (s *Server) DBHandler(client *Client, args ...string) error {
 	return nil
 }
 
-// TODO: make this function available only for authorized users
 func (s *Server) KickoutHandler(client *Client, args ...string) error {
 	// TODO: add confirmation ("Are you sure to kick %USERNAME% out?)"
 
@@ -103,16 +102,7 @@ func (s *Server) KickoutHandler(client *Client, args ...string) error {
 		return nil
 	}
 
-	for _, v := range args {
-		fmt.Fprintf(client.Connection, "arg: %v\n", v)
-	}
-
-	fmt.Fprintf(client.Connection, "args: %+v\n", args)
-	fmt.Fprintf(client.Connection, "args length: %v\n", len(args))
-
-	// for some reason there is always an argument inside
-	// TODO: find out why
-	if len(args) < 1 {
+	if len(args) < 1 || args[0] == "" {
 		return models.ErrorNotEnoughArguments
 	}
 
@@ -124,7 +114,10 @@ func (s *Server) KickoutHandler(client *Client, args ...string) error {
 			kicked = true
 			fmt.Fprintf(client.Connection, "You have successfully kicked %s out\r\n", username)
 			fmt.Fprintf(c.Connection, "You have been kicked out by %s\r\n", client.User.Login)
-			s.Clients.CloseConnection(c.Connection, mu)
+			err := s.Clients.CloseConnection(c.Connection, mu)
+			if err != nil {
+				return err
+			}
 
 			break
 		}

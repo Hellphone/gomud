@@ -6,6 +6,8 @@ import (
 	"net"
 	"regexp"
 	"strings"
+
+	"github.com/hellphone/gomud/domain/models"
 )
 
 func GetCommandInput(conn net.Conn) (string, string, error) {
@@ -19,7 +21,11 @@ func GetCommandInput(conn net.Conn) (string, string, error) {
 	}
 
 	words := strings.Fields(input)
-	if len(words) < 2 {
+	if len(words) == 0 {
+		return "", "", models.ErrorCommandNotFound
+	}
+
+	if len(words) == 1 {
 		return words[0], "", nil
 	}
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/hellphone/gomud/domain/models"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -25,9 +26,9 @@ type ClientList struct {
 
 // TODO: add states
 type Client struct {
-	ID         string
-	Connection net.Conn
-	User       *models.User
+	ID             string
+	Connection     net.Conn
+	User           *models.User
 }
 
 type Connection net.Conn
@@ -80,8 +81,8 @@ func (s *Server) RegisterCommands() error {
 func (c *ClientList) CloseConnection(conn net.Conn, mu *sync.Mutex) error {
 	for k, client := range c.Clients {
 		if client.Connection == conn {
-			// TODO: add mutex
 			// something is wrong and causes panic
+			// TODO: fix the error
 			mu.Lock()
 			c.Clients = RemoveIndex(c.Clients, k)
 			mu.Unlock()
@@ -95,4 +96,8 @@ func RemoveIndex(s []Client, index int) []Client {
 	result := make([]Client, 0)
 	result = append(result, s[:index]...)
 	return append(result, s[index+1:]...)
+}
+
+func (c *Client) UpdateLastActionTime() {
+	c.User.LastActionTime = time.Now()
 }
