@@ -21,14 +21,15 @@ type Server struct {
 type HandlerFunc func(c *Client, args ...string) error
 
 type ClientList struct {
+	Mutex   *sync.Mutex
 	Clients []Client
 }
 
 // TODO: add states
 type Client struct {
-	ID             string
-	Connection     net.Conn
-	User           *models.User
+	ID         string
+	Connection net.Conn
+	User       *models.User
 }
 
 type Connection net.Conn
@@ -78,14 +79,12 @@ func (s *Server) RegisterCommands() error {
 	return nil
 }
 
-func (c *ClientList) CloseConnection(conn net.Conn, mu *sync.Mutex) error {
+func (c *ClientList) CloseConnection(conn net.Conn) error {
+	c.Mutex.Lock()
 	for k, client := range c.Clients {
 		if client.Connection == conn {
-			// something is wrong and causes panic
-			// TODO: fix the error
-			mu.Lock()
 			c.Clients = RemoveIndex(c.Clients, k)
-			mu.Unlock()
+			c.Mutex.Unlock()
 			return conn.Close()
 		}
 	}

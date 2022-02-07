@@ -2,17 +2,14 @@ package server
 
 import (
 	"fmt"
-	"github.com/hellphone/gomud/domain/models"
 	"os"
 	"os/exec"
-	"sync"
 
+	"github.com/hellphone/gomud/domain/models"
 	"github.com/hellphone/gomud/helpers"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
-
-var mu *sync.Mutex
 
 var names = map[string]string{
 	"john":    "12345",
@@ -114,7 +111,7 @@ func (s *Server) KickoutHandler(client *Client, args ...string) error {
 			kicked = true
 			fmt.Fprintf(client.Connection, "You have successfully kicked %s out\r\n", username)
 			fmt.Fprintf(c.Connection, "You have been kicked out by %s\r\n", client.User.Login)
-			err := s.Clients.CloseConnection(c.Connection, mu)
+			err := s.Clients.CloseConnection(c.Connection)
 			if err != nil {
 				return err
 			}
@@ -134,8 +131,7 @@ func (s *Server) ExitHandler(client *Client, args ...string) error {
 	fmt.Fprintf(client.Connection, "Goodbye!\r\n")
 	// TODO: figure out how to run this method (not by passing Clients to Server)
 	// (it's okay)
-	// TODO: add mutex
-	err := s.Clients.CloseConnection(client.Connection, mu)
+	err := s.Clients.CloseConnection(client.Connection)
 	if err != nil {
 		return err
 	}

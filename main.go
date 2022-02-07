@@ -16,8 +16,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-var clients server.ClientList
-
 func main() {
 	cfg, err := getConfig()
 	if err != nil {
@@ -40,7 +38,10 @@ func main() {
 	s := &server.Server{
 		Context:  ctx,
 		DBClient: dbClient,
-		Clients:  &clients,
+		Clients:  &server.ClientList{
+			Mutex:   &sync.Mutex{},
+			Clients: nil,
+		},
 	}
 
 	err = s.RegisterCommands()
@@ -52,13 +53,12 @@ func main() {
 	go func() {
 		// TODO: close connection if user is not active for 5-10 minutes by using goroutine
 		for {
-			var mu *sync.Mutex
 			for _, client := range s.Clients.Clients {
 				// check last active time
 				timeAfterFiveMinutes := client.User.LastActionTime.Add(5 * time.Minute)
 				if time.Now().After(timeAfterFiveMinutes) {
 					fmt.Println("You have been inactive for 5 minutes and will be kicked out")
-					err := s.Clients.CloseConnection(client.Connection, mu)
+					err := s.Clients.CloseConnection(client.Connection)
 					if err != nil {
 						log.Println(err)
 					}
