@@ -22,14 +22,15 @@ type HandlerFunc func(c *Client, args ...string) error
 
 type ClientList struct {
 	Mutex   *sync.Mutex
-	Clients []Client
+	Clients []*Client
 }
 
 // TODO: add states
 type Client struct {
-	ID         string
-	Connection net.Conn
-	User       *models.User
+	ID             string
+	Connection     net.Conn
+	LastActionTime time.Time
+	User           *models.User
 }
 
 type Connection net.Conn
@@ -91,12 +92,12 @@ func (c *ClientList) CloseConnection(conn net.Conn) error {
 	return nil
 }
 
-func RemoveIndex(s []Client, index int) []Client {
-	result := make([]Client, 0)
+func RemoveIndex(s []*Client, index int) []*Client {
+	result := make([]*Client, 0)
 	result = append(result, s[:index]...)
 	return append(result, s[index+1:]...)
 }
 
 func (c *Client) UpdateLastActionTime() {
-	c.User.LastActionTime = time.Now()
+	c.LastActionTime = time.Now()
 }

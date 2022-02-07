@@ -55,9 +55,9 @@ func main() {
 		for {
 			for _, client := range s.Clients.Clients {
 				// check last active time
-				timeAfterFiveMinutes := client.User.LastActionTime.Add(5 * time.Minute)
+				timeAfterFiveMinutes := client.LastActionTime.Add(5 * time.Minute)
 				if time.Now().After(timeAfterFiveMinutes) {
-					fmt.Println("You have been inactive for 5 minutes and will be kicked out")
+					fmt.Fprintf(client.Connection, "You have been inactive for 5 minutes and will be kicked out \r\n")
 					err := s.Clients.CloseConnection(client.Connection)
 					if err != nil {
 						log.Println(err)
@@ -114,16 +114,18 @@ func getConfig() (*models.Config, error) {
 	return cfg, nil
 }
 
-func acceptConnection(ln net.Listener, clients *[]server.Client) (*server.Client, error) {
+func acceptConnection(ln net.Listener, clients *[]*server.Client) (*server.Client, error) {
 	conn, _ := ln.Accept()
 	client := server.Client{
 		Connection: conn,
+		LastActionTime: time.Now(),
 		User: &models.User{
 			Status: models.StatusOffline,
-			LastActionTime: time.Now(),
+			//LastActionTime: time.Now(),
 		},
 	}
-	*clients = append(*clients, client)
+	fmt.Fprintf(client.Connection, "time1:%v", client.LastActionTime)
+	*clients = append(*clients, &client)
 
 	_, err := fmt.Fprintf(conn, "Hello stranger! Welcome to GOMUD!\r\n"+
 		"What would you like to do?\r\n"+
@@ -160,6 +162,7 @@ func handleInput(s *server.Server, c *server.Client) error {
 			fmt.Fprintf(c.Connection, "Not enough arguments\r\n")
 		case nil:
 			c.UpdateLastActionTime()
+			fmt.Fprintf(c.Connection, "time:%v", c.LastActionTime)
 		default:
 			return err
 		}

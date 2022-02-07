@@ -1,7 +1,5 @@
 package models
 
-import "time"
-
 const (
 	StatusOffline Status = iota
 	StatusOnline
@@ -13,7 +11,6 @@ type User struct {
 	Login          string
 	Level          int
 	Status         Status
-	LastActionTime time.Time
 	Location       string
 }
 
